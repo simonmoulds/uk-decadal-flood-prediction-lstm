@@ -118,7 +118,7 @@ cfg['test_end_date']= "01/12/2006"
 cfg['device'] = "cpu" # "cuda:0"
 cfg['validate_every'] = int(3)
 cfg['validate_n_random_basins'] = int(1)
-cfg['metrics'] = "NSE"
+cfg['metrics'] = ["NSE"]
 cfg['model'] = "cudalstm"
 cfg['head'] = "regression"
 cfg['output_activation'] = "linear"
@@ -141,8 +141,8 @@ cfg['save_weights_every'] = int(1)
 cfg['dataset'] = "generic"
 cfg['data_dir'] = "."
 cfg['dynamic_inputs'] = ["NAO", "EA", "AMV", "P", "T"]
-cfg['target_variables'] = "Q95"
-cfg['clip_targets_to_zero'] = "Q95"
+cfg['target_variables'] = ["Q95"]
+cfg['clip_targets_to_zero'] = ["Q95"]
 
 conf_filename = os.path.join(outputdir, 'basins.yml')
 with open(conf_filename, 'wb') as f:

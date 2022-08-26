@@ -14,8 +14,10 @@ rule all:
         # expand('results/analysis/{aggr}/input', aggr = AGGR)
         # 'results/nrfa-discharge-summaries',
         # 'results/nrfa-metadata.parquet',
-        expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
-        expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR)
+        expand('results/analysis/{aggr}/gamlss-output/prediction', aggr = AGGR),
+        # expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
+        # expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR)
+        'results/analysis/yr2to9_lag/nh-output/time_series'
 
 rule obs_input:
     input:
@@ -105,6 +107,20 @@ rule build_catchment_dataset:
         Rscript {input.script} {input.config} {input.obs} {wildcards.aggr} {params.outputdir}
         """
 
+rule fit_gamlss_models:
+    input:
+        expand('results/analysis/{aggr}/input', aggr = AGGR),
+        script='workflow/scripts/fit_models.R',
+        config='config/config.yml'
+    output:
+        directory('results/analysis/{aggr}/gamlss-output/prediction')
+    params:
+        outputdir='results'
+    shell:
+        """
+        Rscript {input.script} {input.config} {wildcards.aggr} {params.outputdir}
+        """
+
 rule prepare_nh_input:
     input:
         expand('results/analysis/{aggr}/input', aggr = AGGR),
@@ -118,6 +134,21 @@ rule prepare_nh_input:
     shell:
         """
         python {input.script} {input.config} {wildcards.aggr} {params.outputdir}
+        """
+
+rule process_nh_output:
+    input:
+        expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
+        expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR),
+        script='workflow/scripts/process-nh-output.py',
+        config='config/config.yml'
+    output:
+        directory('results/analysis/yr2to9_lag/nh-output/time_series')
+    params:
+        outputdir='results'
+    shell:
+        """
+        python {input.script} {input.config} yr2to9_lag {params.outputdir}
         """
 
 # rule fit_models:
