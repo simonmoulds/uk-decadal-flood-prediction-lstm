@@ -110,7 +110,7 @@ rule build_catchment_dataset:
 rule fit_gamlss_models:
     input:
         expand('results/analysis/{aggr}/input', aggr = AGGR),
-        script='workflow/scripts/fit_models.R',
+        script='workflow/scripts/fit-models.R',
         config='config/config.yml'
     output:
         directory('results/analysis/{aggr}/gamlss-output/prediction')
@@ -135,6 +135,23 @@ rule prepare_nh_input:
         """
         python {input.script} {input.config} {wildcards.aggr} {params.outputdir}
         """
+
+# rule run_nh:
+#     input:
+#         expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
+#         expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR),
+#         'results/analysis/{aggr}/nh-input/basins.txt',
+#         'results/analysis/{aggr}/nh-input/basins.yml'
+#     output:
+#         directory('results/analysis/{aggr}/nh-input/runs')
+#     params:
+#         outputdir='results'
+# #     conda:
+# #         neuralhydrology
+#     shell:
+#         """
+#         python {input.script}
+#         """
 
 rule process_nh_output:
     input:
