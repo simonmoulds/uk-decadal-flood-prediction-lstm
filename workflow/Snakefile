@@ -14,9 +14,11 @@ rule all:
         # expand('results/analysis/{aggr}/input', aggr = AGGR)
         # 'results/nrfa-discharge-summaries',
         # 'results/nrfa-metadata.parquet',
-        expand('results/analysis/{aggr}/gamlss-output/prediction', aggr = AGGR),
+        # expand('results/analysis/{aggr}/gamlss-output/prediction', aggr = AGGR),
         # expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
-        # expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR)
+        # expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR),
+        # 'results/analysis/yr2to9_lag/nh-output/time_series',
+        expand('results/analysis/{aggr}/gamlss-output/prediction', aggr = AGGR),
         'results/analysis/yr2to9_lag/nh-output/time_series'
 
 rule obs_input:
@@ -27,6 +29,8 @@ rule obs_input:
         'results/obs.parquet'
     params:
         outputdir='results'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         python {input.script} -i {input.config} -o {params.outputdir}
@@ -38,6 +42,8 @@ rule mod_input:
         config='config/config.yml'
     output:
         directory('results/ensemble-forecast')
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         mkdir -p {output}
@@ -50,6 +56,8 @@ rule select_stations:
         config='config/config.yml'
     output:
         'results/stations.txt'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         Rscript {input.script} {input.config} {output}
@@ -64,6 +72,8 @@ rule get_discharge_data:
         'results/nrfa-metadata.parquet'
     params:
         outputdir='results'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         Rscript {input.script} {input.stations} {params.outputdir}
@@ -84,6 +94,8 @@ rule nao_matching:
         'results/analysis/{aggr}/matched_ensemble_error.parquet'
     params:
         outputdir='results/analysis'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         Rscript {input.script} {input.config} {input.obs} {input.fcst} {wildcards.aggr} {params.outputdir}
@@ -102,6 +114,8 @@ rule build_catchment_dataset:
         directory('results/analysis/{aggr}/input')
     params:
         outputdir='results'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         Rscript {input.script} {input.config} {input.obs} {wildcards.aggr} {params.outputdir}
@@ -116,6 +130,8 @@ rule fit_gamlss_models:
         directory('results/analysis/{aggr}/gamlss-output/prediction')
     params:
         outputdir='results'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         Rscript {input.script} {input.config} {wildcards.aggr} {params.outputdir}
@@ -128,61 +144,34 @@ rule prepare_nh_input:
         config='config/config.yml'
     output:
         directory('results/analysis/{aggr}/nh-input/time_series'),
-        directory('results/analysis/{aggr}/nh-input/attributes')
+        directory('results/analysis/{aggr}/nh-input/attributes'),
+        'results/analysis/{aggr}/nh-input/basins.txt',
+        'results/analysis/{aggr}/nh-input/basins.yml'
     params:
         outputdir='results'
+    conda:
+        "decadal-flood-prediction"
     shell:
         """
         python {input.script} {input.config} {wildcards.aggr} {params.outputdir}
         """
 
-# rule run_nh:
-#     input:
-#         expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
-#         expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR),
-#         'results/analysis/{aggr}/nh-input/basins.txt',
-#         'results/analysis/{aggr}/nh-input/basins.yml'
-#     output:
-#         directory('results/analysis/{aggr}/nh-input/runs')
-#     params:
-#         outputdir='results'
-# #     conda:
-# #         neuralhydrology
-#     shell:
-#         """
-#         python {input.script}
-#         """
-
-rule process_nh_output:
+rule run_nh:
     input:
-        expand('results/analysis/{aggr}/nh-input/time_series', aggr = AGGR),
-        expand('results/analysis/{aggr}/nh-input/attributes', aggr = AGGR),
-        script='workflow/scripts/process-nh-output.py',
+        'results/analysis/yr2to9_lag/nh-input/time_series',
+        'results/analysis/yr2to9_lag/nh-input/attributes',
+        'results/analysis/yr2to9_lag/nh-input/basins.txt',
+        nh_config='results/analysis/yr2to9_lag/nh-input/basins.yml',
+        script='workflow/scripts/run-nh.py',
         config='config/config.yml'
     output:
         directory('results/analysis/yr2to9_lag/nh-output/time_series')
-    params:
-        outputdir='results'
+    conda:
+        "neuralhydrology"
     shell:
         """
-        python {input.script} {input.config} yr2to9_lag {params.outputdir}
+        python {input.script} {input.nh_config} {output}
         """
-
-# rule fit_models:
-#     input:
-#         expand('results/analysis/{aggr}/input', aggr = AGGR),
-#         script='workflow/scripts/R/fit-models.R',
-#         config='config/config.yml'
-#     output:
-#         directory('results/analysis/{expm}')
-#     wildcard_constraints:
-#         expm='|'.join([re.escape(x) for x in EXPM])
-#     params:
-#         outputdir='results'
-#     shell:
-#         """
-#         Rscript {input.script} {input.config} {wildcards.expm} {params.outputdir}
-#         """
 
 # rule make_plots:
 #     input:

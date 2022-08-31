@@ -45,7 +45,17 @@ metadata =
 camels <- st_read(file.path(config$aux_data$camels, "data", "CAMELS_GB_catchment_boundaries.shp"))
 camels_stations <- camels$ID_STRING %>% unique() %>% as.integer()
 
-metadata <- metadata %>% filter(id %in% camels_stations)
+## Now identify stations included in the CAMELS-GB dataset
+ukbn2_stations <- read_csv(
+  file.path(config$aux_data$ukbn, "UKBN_Station_List_vUKBN2.0_1.csv"),
+  show_col_types = FALSE
+)
+## Allow benchmark scores of 1 (caution) and 2 (suitable)
+ukbn2_stations <- ukbn2_stations[ukbn2_stations$High_Score >= 1, "Station"]
+ukbn2_stations <- unlist(ukbn2_stations) %>% unname()
+
+## Now filter UKBN2 stations
+metadata <- metadata %>% filter(id %in% camels_stations & id %in% ukbn2_stations)
 stations <- metadata$id %>% as.character()
 
 ## TODO changepoint analysis [see Lopez and Frances (2013)]

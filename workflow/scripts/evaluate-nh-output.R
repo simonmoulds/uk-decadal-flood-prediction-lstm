@@ -26,6 +26,18 @@ if (sys.nframe() == 0L) {
   ## cwd <- dirname(regmatches(args, m))
 }
 
+## For testing:
+outputroot <- "results"
+nh_inputdir <- file.path(outputroot, "analysis", "yr2to9_lag", "nh-output", "time_series")
+plot_outputdir <- file.path(outputroot, "analysis", "yr2to9_lag", "nh-output", "plots")
+gamlss_inputdir <- file.path(outputroot, "analysis", "yr2to9_lag", "gamlss-output", "prediction")
+metadata <- read_parquet(file.path(outputroot, "nrfa-metadata.parquet"))
+
+if (dir.exists(plot_outputdir)) {
+  unlink(plot_outputdir, recursive = TRUE)
+}
+dir.create(plot_outputdir, showWarnings = FALSE)
+
 ## Text size for plot labels
 axis_title_size_large = 9
 axis_title_size = 8
@@ -59,16 +71,101 @@ mean_square_error_skill_score = function(obs, exp, na.rm = TRUE) {
   list(msss = msss, ps = ps, srel = srel, sme = sme)
 }
 
-## For testing:
-outputroot <- "results"
-
-nh_inputdir <- file.path(outputroot, "analysis", "yr2to9_lag", "nh-output", "time_series")
-
-gamlss_inputdir <- file.path(outputroot, "analysis", "yr2to9_lag", "gamlss-output", "prediction")
-metadata <- read_parquet(file.path(outputroot, "nrfa-metadata.parquet"))
-
 y <- open_dataset(gamlss_inputdir) %>% collect()
 station_ids <- y$ID %>% unique()
+n_stations <- length(station_ids)
+
+## msss_list <- list()
+## for (i in 1:n_stations) {
+##   stn <- station_ids[i]
+##   catchment_area <- metadata %>% filter(id %in% stn) %>% `$`(catchment_area)
+
+##   ## Read GAMLSS model prediction
+##   yy <- y %>% filter(ID %in% stn) %>% rename(gamlss_exp = exp) %>% dplyr::select(year, obs, gamlss_exp)
+##   yy$obs <- yy$obs * 86400 / catchment_area * 1000 / 1000 / 1000
+##   yy$gamlss_exp <- yy$gamlss_exp * 86400 / catchment_area * 1000 / 1000 / 1000
+
+##   ## Read LSTM prediction
+##   xx <- read_csv(file.path(nh_inputdir, paste0(stn, ".csv")), show_col_types = FALSE)
+##   xx <- xx %>%
+##     mutate(year = lubridate::year(date)) %>%
+##     rename(obs = Q95_obs, nh_exp = Q95_sim) %>%
+##     dplyr::select(year, obs, nh_exp, -date, -time_step) %>%
+##     mutate(year = year - 1) # FIXME
+##     ## gather(-season_year, key = "key", value = "value")
+
+##   ## Compute MSSS
+##   idx <- is.na(yy$gamlss_exp) | is.na(xx$nh_exp)
+##   gamlss_msss <- mean_square_error_skill_score(yy$obs[!idx], yy$gamlss_exp[!idx])$msss
+##   lstm_msss <- mean_square_error_skill_score(xx$obs[!idx], xx$nh_exp[!idx])$msss
+##   msss_list[[i]] <- tibble(ID = stn, GAMLSS=gamlss_msss, LSTM=lstm_msss)
+
+##   ## Make plot
+##   xx <- xx %>%
+##     left_join(yy %>% dplyr::select(-obs), by = c("year")) %>%
+##     gather(-year, key = "key", value = "value") %>%
+##     filter(!key %in% "obs")
+
+##   xx <- xx %>% mutate(key = factor(key, levels = c("nh_exp", "gamlss_exp"), labels = c("LSTM", "GAMLSS")))
+##   p <- ggplot() +
+##     theme_bw() +
+##     geom_line(
+##       aes(y=value, x=year, colour = key), data=xx
+##     ) +
+##     ## scale_fill_manual(values = cbbPalette) +
+##     ## scale_color_manual(values = cbbPalette) +
+##     ## scale_fill_discrete(values = cbbPalette) +
+##     ## scale_colour_discrete(values = cbbPalette) +
+##     ## facet_wrap(. ~ ID, ncol = 1) + #, labeller = label_parsed) +
+##     ylab(expression(Streamflow~(mm~d^{-1}))) +
+##     xlab("") +
+##     ## scale_x_continuous(breaks = pretty_breaks()) +
+##     ## ## scale_y_continuous(expression(Streamflow~(m^{3}~s^{-1})), breaks = pretty_breaks()) +
+##     ## ## N.B. use alpha to create another legend
+##     ## ## https://aosmith.rbind.io/2020/07/09/ggplot2-override-aes/
+##     ## ## geom_point(
+##     geom_line(
+##       aes(y=obs, x=year), #, alpha="Observed"),
+##       color = "black",
+##       data=yy,
+##       size = 1 #0.2
+##     ) +
+##     ## scale_alpha_manual(name=NULL, values=1, breaks="Observed") +
+##     ## ggtitle(sprintf("ID = %d", stn_id)) +
+##     theme(legend.position = "bottom",
+##           legend.direction = "vertical",
+##           legend.title = element_blank(),
+##           strip.background = element_blank(),
+##           panel.grid = element_blank(),
+##           strip.text = element_text(size = strip_label_size),
+##           ## legend.title = element_text(size = legend_title_size),
+##           legend.text = element_text(size = legend_label_size),
+##           axis.title.y = element_blank(),
+##           axis.text.y = element_text(size = axis_label_size_small),
+##           axis.text.x = element_text(size = axis_label_size_small))
+##   ggsave(file.path(plot_outputdir, paste0("ts_plot_", stn, ".png")), width = 5, height = 5, units = "in")
+## }
+
+## msss <- do.call("rbind", msss_list)
+
+## length(which(msss$LSTM > msss$GAMLSS))
+## length(which(msss$LSTM < 0))
+## msss %>% arrange(desc(GAMLSS))
+## msss %>% arrange(desc(LSTM))
+## msss %>% arrange(LSTM)
+
+## msss <- msss %>% filter(LSTM > 0)
+## plot(msss$GAMLSS, msss$LSTM, xlim = c(0, 1), ylim = c(0, 1))
+## boxplot(msss$LSTM)
+fs <- list.files("results/analysis/yr2to9_lag/nh-output/time_series", full.names = T)
+data_list <- list()
+for (i in 1:length(fs)) {
+  data_list[[i]] = read_csv(fs[i], show_col_types = FALSE)
+}
+x <- do.call("rbind", data_list)
+x <- x %>% arrange(ID)
+
+station_ids <- x$ID %>% unique()
 n_stations <- length(station_ids)
 
 msss_list <- list()
@@ -82,7 +179,8 @@ for (i in 1:n_stations) {
   yy$gamlss_exp <- yy$gamlss_exp * 86400 / catchment_area * 1000 / 1000 / 1000
 
   ## Read LSTM prediction
-  xx <- read_csv(file.path(nh_inputdir, paste0(stn, ".csv")), show_col_types = FALSE)
+  xx <- x %>% filter(ID %in% stn) %>% arrange(date)
+  ## xx <- read_csv(file.path(nh_inputdir, paste0(stn, ".csv")), show_col_types = FALSE)
   xx <- xx %>%
     mutate(year = lubridate::year(date)) %>%
     rename(obs = Q95_obs, nh_exp = Q95_sim) %>%
@@ -90,22 +188,29 @@ for (i in 1:n_stations) {
     mutate(year = year - 1) # FIXME
     ## gather(-season_year, key = "key", value = "value")
 
+  yy <- yy %>% left_join(xx %>% dplyr::select(-obs), by = "year")
+
   ## Compute MSSS
-  idx <- is.na(yy$gamlss_exp) | is.na(xx$nh_exp)
+  idx <- is.na(yy$gamlss_exp) | is.na(yy$nh_exp)
   gamlss_msss <- mean_square_error_skill_score(yy$obs[!idx], yy$gamlss_exp[!idx])$msss
   lstm_msss <- mean_square_error_skill_score(xx$obs[!idx], xx$nh_exp[!idx])$msss
   msss_list[[i]] <- tibble(ID = stn, GAMLSS=gamlss_msss, LSTM=lstm_msss)
 
   ## Make plot
-  xx <- xx %>%
-    left_join(yy %>% dplyr::select(-obs), by = c("year")) %>%
+  ## xx <- xx %>%
+  ##   left_join(yy %>% dplyr::select(-obs), by = c("year")) %>%
+  plot_data <- yy %>%
+    dplyr::select(-obs) %>%
     gather(-year, key = "key", value = "value") %>%
     filter(!key %in% "obs")
+
+  plot_data <- plot_data %>%
+    mutate(key = factor(key, levels = c("nh_exp", "gamlss_exp"), labels = c("LSTM", "GAMLSS")))
 
   p <- ggplot() +
     theme_bw() +
     geom_line(
-      aes(y=value, x=year, colour = key), data=xx
+      aes(y=value, x=year, colour = key), data=plot_data
     ) +
     ## scale_fill_manual(values = cbbPalette) +
     ## scale_color_manual(values = cbbPalette) +
@@ -138,6 +243,13 @@ for (i in 1:n_stations) {
           axis.title.y = element_blank(),
           axis.text.y = element_text(size = axis_label_size_small),
           axis.text.x = element_text(size = axis_label_size_small))
+  ggsave(file.path(plot_outputdir, paste0("ts_plot_", stn, ".png")), width = 5, height = 5, units = "in")
 }
 
 msss <- do.call("rbind", msss_list)
+
+length(which(msss$LSTM > msss$GAMLSS))
+length(which(msss$LSTM < 0))
+msss %>% arrange(desc(GAMLSS))
+msss %>% arrange(desc(LSTM))
+msss %>% arrange(LSTM)
