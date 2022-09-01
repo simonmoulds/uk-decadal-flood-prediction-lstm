@@ -124,8 +124,8 @@ static_attributes = climatic_attributes + \
     soil_attributes + \
     topographic_attributes
 
-dynamic_inputs = ['P', 'T']
-static_attributes = ['gauge_lat', 'gauge_lon', 'p_mean', 'pet_mean', 'area', 'q_mean'] #, 'frac_snow', 'high_prec_freq', 'high_prec_dur', 'low_prec_freq', 'low_prec_dur']
+dynamic_inputs = ['P', 'T', 'EA', 'AMV']
+# static_attributes = ['gauge_lat', 'gauge_lon', 'p_mean', 'pet_mean', 'area'] #, 'q_mean']#, 'frac_snow', 'high_prec_freq', 'high_prec_dur', 'low_prec_freq', 'low_prec_dur']
 
 yaml = YAML() #typ = 'safe')
 cfg = yaml.load(Path('resources/nh-config-template.yml'))
@@ -148,17 +148,17 @@ cfg['save_validation_results'] = True
 cfg['model'] = "cudalstm" #"cudalstm" # "ealstm"
 cfg['head'] = "regression"
 cfg['output_activation'] = "linear"
-cfg['hidden_size'] = int(128) #int(20) #int(64) #int(20)
+cfg['hidden_size'] = int(64) #int(128) #int(20) #int(64) #int(20)
 cfg['initial_forget_bias'] = int(3)
 cfg['output_dropout'] = 0.4
 cfg['optimizer'] = "Adam"
 cfg['loss'] = "MSE"
 cfg['learning_rate'] = {0: 1e-2, 30: 5e-3, 40: 1e-3}
-cfg['batch_size'] = int(256)
-cfg['epochs'] = int(50) #int(500) #int(150) #int(75)
+cfg['batch_size'] = int(128) #int(256)
+cfg['epochs'] = int(100) #int(50) #int(500) #int(150) #int(75)
 cfg['clip_gradient_norm'] = int(1)
 cfg['predict_last_n'] = int(1)
-cfg['seq_length'] = int(8)
+cfg['seq_length'] = int(2) #int(4) #int(8)
 cfg['num_workers'] = int(8)
 cfg['log_interval'] = int(5)
 cfg['log_tensorboard'] = True

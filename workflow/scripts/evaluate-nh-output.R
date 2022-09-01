@@ -192,9 +192,14 @@ for (i in 1:n_stations) {
 
   ## Compute MSSS
   idx <- is.na(yy$gamlss_exp) | is.na(yy$nh_exp)
-  gamlss_msss <- mean_square_error_skill_score(yy$obs[!idx], yy$gamlss_exp[!idx])$msss
-  lstm_msss <- mean_square_error_skill_score(xx$obs[!idx], xx$nh_exp[!idx])$msss
-  msss_list[[i]] <- tibble(ID = stn, GAMLSS=gamlss_msss, LSTM=lstm_msss)
+  gamlss_skill <- mean_square_error_skill_score(yy$obs[!idx], yy$gamlss_exp[!idx]) %>%
+    as_tibble() %>%
+    mutate(ID = stn, model = "LSTM", .before = msss)
+  lstm_skill <- mean_square_error_skill_score(yy$obs[!idx], yy$nh_exp[!idx]) %>%
+    as_tibble() %>%
+    mutate(ID = stn, model = "GAMLSS", .before = msss)
+  skill <- rbind(gamlss_skill, lstm_skill)
+  msss_list[[i]] <- skill #tibble(ID = stn, GAMLSS=gamlss_msss, LSTM=lstm_msss)
 
   ## Make plot
   ## xx <- xx %>%
@@ -247,9 +252,100 @@ for (i in 1:n_stations) {
 }
 
 msss <- do.call("rbind", msss_list)
+msss_lstm <- msss %>% filter(model %in% "LSTM")
+msss_lstm %>% arrange(desc(msss))
+## length(which(msss$LSTM > msss$GAMLSS))
+## length(which(msss$LSTM < 0))
+## msss %>% arrange(desc(GAMLSS))
+## msss %>% arrange(LSTM)
 
-length(which(msss$LSTM > msss$GAMLSS))
-length(which(msss$LSTM < 0))
-msss %>% arrange(desc(GAMLSS))
-msss %>% arrange(desc(LSTM))
-msss %>% arrange(LSTM)
+## msss_lstm_0 <- msss %>% filter(model %in% "LSTM" & msss > 0) %>% arrange(desc(msss))
+
+## For spatial plots:
+library(sf)
+uk_boundary =
+  st_read("../data-raw/CNTR_RG_01M_2020_4326.shp") %>%
+  filter(CNTR_NAME %in% "United Kingdom") %>%
+  st_transform(crs = 27700)
+
+europe_boundary =
+  st_read("../data-raw/CNTR_RG_01M_2020_4326.shp") %>%
+  filter(!CNTR_NAME %in% "United Kingdom") %>%
+  st_transform(crs = 27700)
+
+library(rnrfa)
+gauge_stns =
+  catalogue() %>%
+  rename(ID = id, area = "catchment-area") %>%
+  filter(ID %in% station_ids) %>%
+  dplyr::select(ID, name, area, latitude, longitude) %>%
+  st_as_sf(coords=c("longitude", "latitude")) %>%
+  st_set_crs(4326) %>%
+  st_transform(27700)
+
+rdbu_pal = RColorBrewer::brewer.pal(9, "RdBu")
+p = ggplot() +
+  geom_sf(
+    data = europe_boundary,
+    color=NA,
+    fill="lightgrey"
+  ) +
+  geom_sf(
+    data = uk_boundary,
+    lwd = 0.25
+  ) +
+  geom_sf(
+    data = gauge_stns %>% left_join(msss_lstm, by = "ID"),
+    aes(fill = msss),
+    shape = 21,
+    size = 1.5,
+    lwd = 0.1,
+    alpha = 0.8
+  ) +
+  ## facet_wrap(. ~ period, ncol = 1) +
+  coord_sf(
+    xlim = c(-8, 2),
+    ylim = c(50, 59),
+    default_crs = st_crs(4326)
+  ) +
+  ## scale_shape_manual(values = c(21, 24, 22)) +
+  scale_fill_stepsn(
+    colours = rdbu_pal,
+    ## breaks = seq(-0.8, 0.8, 0.2),
+    ## values = scales::rescale(c(-0.8, 0, 0.8)),
+    ## limits = c(-0.3, 0.9)
+    breaks = seq(-0.2, 0.8, 0.2),
+    values = scales::rescale(c(-0.2, 0, 0.8)),
+    limits = c(-0.1, 0.9)
+  ) +
+  theme_bw() +
+  theme(
+    strip.background = element_blank(),
+    ## legend.position = "bottom",
+    ## legend.box = "vertical",
+    ## legend.justification = "left",
+    ## legend.box.just = "left",
+    legend.title = element_text(size = legend_title_size),
+    legend.text = element_text(size = legend_label_size),
+    strip.text = element_blank(),
+    panel.grid.major = element_line(size = 0.25),
+    axis.text = element_text(size = axis_label_size_small)
+  ) +
+  guides(
+    shape = guide_legend(
+      title = "Model",
+      title.position = "top",
+      order = 1
+    ),
+    fill = guide_colorbar(
+      title="MSSS",
+      title.position="top",
+      frame.colour = "black",
+      ticks.colour = "black",
+      frame.linewidth = 0.25,
+      ticks.linewidth = 0.25,
+      barwidth = 0.75,
+      barheight = 10,
+      order = 2
+    )
+  )

@@ -32,7 +32,7 @@ cfg = yaml.load(Path(nh_config))
 
 # years = [y for y in range(1961, 2007)]
 years = [y for y in range(1961, 2007)]
-padding = 10
+padding = 20
 seq_length = int(cfg['seq_length'])
 n_test = 1
 n_validate = 1
